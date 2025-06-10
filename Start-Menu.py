@@ -1,6 +1,29 @@
 import pygame
 import sys
 import subprocess
+import json
+import os
+
+SETTINGS_FILE = "settings.json"
+
+def load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as f:
+            return json.load(f)
+    return {"invert_colors": False}
+
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(settings, f)
+
+def invert_color(color):
+    return tuple(255 - c for c in color[:3])
+
+def invert_surface(surface):
+    import numpy as np
+    arr = pygame.surfarray.array3d(surface)
+    arr = 255 - arr
+    return pygame.surfarray.make_surface(arr)
 
 pygame.init()
 
@@ -9,16 +32,25 @@ screen_width, screen_height = info.current_w, info.current_h
 screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
 pygame.display.set_caption("Full Screen Pygame Window")
 
+settings = load_settings()
+invert = settings.get("invert_colors", False)
+
 # Load and scale the background image
-background = pygame.image.load("background.png")  # Change to your image filename
-background = pygame.transform.scale(background, (screen_width, screen_height))  # Scale to fit the screen
+background = pygame.image.load("background.png")
+background = pygame.transform.scale(background, (screen_width, screen_height))
+if invert:
+    background = invert_surface(background)
 
 font = pygame.font.SysFont(None, 80)
-button_text = font.render("Start", True, (255, 255, 255))
-button_text_rect = button_text.get_rect(center=(screen_width // 2, screen_height // 2 - 20))
+fg = (255, 255, 255) if not invert else (0, 0, 0)
+button_text = font.render("Start", True, fg)
+button_text_rect = button_text.get_rect(center=(screen_width // 2, screen_height // 2 - 80 + 100))
 
-quit_text = font.render("Quit", True, (255, 255, 255))
-quit_text_rect = quit_text.get_rect(center=(screen_width // 2, screen_height // 2 + 120))
+settings_text = font.render("Settings", True, fg)
+settings_text_rect = settings_text.get_rect(center=(screen_width // 2, screen_height // 2 + 0 + 100))
+
+quit_text = font.render("Quit", True, fg)
+quit_text_rect = quit_text.get_rect(center=(screen_width // 2, screen_height // 2 + 80 + 100))
 
 running = True
 while running:
@@ -26,17 +58,24 @@ while running:
         if event.type == pygame.QUIT or (
             event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
         ):
+            settings["invert_colors"] = False
+            save_settings(settings)
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if button_text_rect.collidepoint(event.pos):
-                # Launch level_select.py instead of testi.py
                 subprocess.Popen([sys.executable, "level_select.py"])
                 running = False
             elif quit_text_rect.collidepoint(event.pos):
+                settings["invert_colors"] = False
+                save_settings(settings)
+                running = False
+            elif settings_text_rect.collidepoint(event.pos):
+                subprocess.Popen([sys.executable, "settings.py"])
                 running = False
 
-    screen.blit(background, (0, 0))  # Draw the scaled background image
+    screen.blit(background, (0, 0))
     screen.blit(button_text, button_text_rect)
+    screen.blit(settings_text, settings_text_rect)
     screen.blit(quit_text, quit_text_rect)
     pygame.display.flip()
 
