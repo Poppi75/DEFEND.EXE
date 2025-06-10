@@ -69,7 +69,7 @@ while running:
                 if rect.collidepoint(mouse_pos):
                     if i < unlocked_levels:
                         if i == 0:
-                            subprocess.Popen([sys.executable, "testi.py"])
+                            subprocess.Popen([sys.executable, "level1.py"])
                             running = False
                         else:
                             print(f"Level {i+1} selected!")  # Placeholder for other levels

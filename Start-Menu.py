@@ -20,7 +20,6 @@ def invert_color(color):
     return tuple(255 - c for c in color[:3])
 
 def invert_surface(surface):
-    import numpy as np
     arr = pygame.surfarray.array3d(surface)
     arr = 255 - arr
     return pygame.surfarray.make_surface(arr)
