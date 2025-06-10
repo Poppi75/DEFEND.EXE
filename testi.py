@@ -1,83 +1,106 @@
 import pygame
 import sys
-import math
+import json
+import os
+
+SETTINGS_FILE = "settings.json"
+
+def load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as f:
+            return json.load(f)
+    return {"invert_colors": False}
+
+def invert_color(color):
+    return tuple(255 - c for c in color[:3])
 
 pygame.init()
 
 VIRTUAL_WIDTH, VIRTUAL_HEIGHT = 800, 480  # Swapped for landscape
 info = pygame.display.Info()
 SCREEN_WIDTH, SCREEN_HEIGHT = info.current_w, info.current_h
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Simple Tower Defense (Landscape)")
 virtual_surface = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
+
+settings = load_settings()
+invert = settings.get("invert_colors", False)
 
 # Enemy path (adjusted for landscape)
 PATH = [(0, 240), (200, 240), (200, 50), (600, 50), (600, 430), (800, 430)]
 
 class Enemy:
     def __init__(self):
+        self.pos = list(PATH[0])
         self.path_index = 0
-        self.x, self.y = PATH[0]
-        self.speed = 1.2
+        self.speed = 2
         self.radius = 15
-        self.hp = 1  # 1-shot kill
 
     def move(self):
-        if self.path_index + 1 < len(PATH):
-            tx, ty = PATH[self.path_index + 1]
-            dx, dy = tx - self.x, ty - self.y
-            dist = math.hypot(dx, dy)
+        if self.path_index < len(PATH) - 1:
+            target = PATH[self.path_index + 1]
+            dx, dy = target[0] - self.pos[0], target[1] - self.pos[1]
+            dist = (dx ** 2 + dy ** 2) ** 0.5
             if dist < self.speed:
-                self.x, self.y = tx, ty
+                self.pos = list(target)
                 self.path_index += 1
             else:
-                self.x += self.speed * dx / dist
-                self.y += self.speed * dy / dist
+                self.pos[0] += self.speed * dx / dist
+                self.pos[1] += self.speed * dy / dist
 
     def draw(self, surf):
-        pygame.draw.circle(surf, (200, 50, 50), (int(self.x), int(self.y)), self.radius)
-        pygame.draw.rect(surf, (0,255,0), (self.x-15, self.y-25, 30*self.hp/1, 5))
+        color = (200, 0, 0) if not invert else invert_color((200, 0, 0))
+        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), self.radius)
 
     def reached_end(self):
-        return self.path_index == len(PATH) - 1 and math.hypot(self.x - PATH[-1][0], self.y - PATH[-1][1]) < 2
+        return self.path_index == len(PATH) - 1
 
 class Tower:
     def __init__(self, x, y):
         self.x, self.y = x, y
         self.range = 120
-        self.reload = 0
+        self.cooldown = 0
 
     def draw(self, surf):
-        pygame.draw.rect(surf, (100, 100, 255), (self.x-15, self.y-15, 30, 30))
-        pygame.draw.circle(surf, (100,100,255,40), (self.x, self.y), self.range, 1)
+        color = (0, 0, 200) if not invert else invert_color((0, 0, 200))
+        pygame.draw.rect(surf, color, (self.x - 20, self.y - 20, 40, 40))
+        # Draw range
+        pygame.draw.circle(surf, (100, 100, 255) if not invert else invert_color((100, 100, 255)), (self.x, self.y), self.range, 1)
 
-    def shoot(self, enemies, bullets):
-        if self.reload > 0:
-            self.reload -= 1
-            return
-        for e in enemies:
-            if math.hypot(e.x - self.x, e.y - self.y) < self.range:
-                bullets.append(Bullet(self.x, self.y, e))
-                self.reload = 30
-                break
+    def can_shoot(self):
+        return self.cooldown == 0
+
+    def shoot(self, enemy):
+        self.cooldown = 30
+        return Bullet(self.x, self.y, enemy)
+
+    def update(self):
+        if self.cooldown > 0:
+            self.cooldown -= 1
 
 class Bullet:
-    def __init__(self, x, y, target):
+    def __init__(self, x, y, enemy):
         self.x, self.y = x, y
-        self.target = target
-        self.speed = 6
+        self.target = enemy
+        self.speed = 8
+        self.radius = 6
 
     def move(self):
-        dx, dy = self.target.x - self.x, self.target.y - self.y
-        dist = math.hypot(dx, dy)
-        if dist < self.speed or self.target.hp <= 0:
-            return True
-        self.x += self.speed * dx / dist
-        self.y += self.speed * dy / dist
-        return False
+        dx, dy = self.target.pos[0] - self.x, self.target.pos[1] - self.y
+        dist = (dx ** 2 + dy ** 2) ** 0.5
+        if dist < self.speed or dist == 0:
+            self.x, self.y = self.target.pos[0], self.target.pos[1]
+        else:
+            self.x += self.speed * dx / dist
+            self.y += self.speed * dy / dist
 
     def draw(self, surf):
-        pygame.draw.circle(surf, (255,255,0), (int(self.x), int(self.y)), 6)
+        color = (255, 255, 0) if not invert else invert_color((255, 255, 0))
+        pygame.draw.circle(surf, color, (int(self.x), int(self.y)), self.radius)
+
+    def hit(self):
+        dx, dy = self.target.pos[0] - self.x, self.target.pos[1] - self.y
+        return (dx ** 2 + dy ** 2) ** 0.5 < self.radius + self.target.radius
 
 enemies = []
 bullets = []
@@ -86,81 +109,79 @@ spawn_timer = 0
 lives = 5
 score = 0
 
+font = pygame.font.SysFont(None, 40)
+small_font = pygame.font.SysFont(None, 30)
+
 running = True
 while running:
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT or (
+            event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+        ):
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mx, my = event.pos
-            scale = min(SCREEN_WIDTH / VIRTUAL_WIDTH, SCREEN_HEIGHT / VIRTUAL_HEIGHT)
-            x_offset = (SCREEN_WIDTH - VIRTUAL_WIDTH * scale) // 2
-            y_offset = (SCREEN_HEIGHT - VIRTUAL_HEIGHT * scale) // 2
-            vx = int((mx - x_offset) / scale)
-            vy = int((my - y_offset) / scale)
-            if 0 <= vx <= VIRTUAL_WIDTH and 0 <= vy <= VIRTUAL_HEIGHT:
-                towers.append(Tower(vx, vy))
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            # Convert to virtual coordinates
+            vx = int(mx * VIRTUAL_WIDTH / SCREEN_WIDTH)
+            vy = int(my * VIRTUAL_HEIGHT / SCREEN_HEIGHT)
+            towers.append(Tower(vx, vy))
 
+    # Game logic
     spawn_timer += 1
-    if spawn_timer > 60 and len(enemies) < 10:
+    if spawn_timer > 60:
         enemies.append(Enemy())
         spawn_timer = 0
 
-    for e in enemies:
-        e.move()
-    for tower in towers:
-        tower.shoot(enemies, bullets)
-
-    for b in bullets[:]:
-        if b.move():
-            if b.target.hp > 0:
-                b.target.hp -= 1
-            bullets.remove(b)
-
-    for e in enemies[:]:
-        if e.hp <= 0:
-            enemies.remove(e)
-            score += 1
-        elif e.reached_end():
-            enemies.remove(e)
+    for enemy in enemies[:]:
+        enemy.move()
+        if enemy.reached_end():
+            enemies.remove(enemy)
             lives -= 1
+            if lives <= 0:
+                running = False
 
-    virtual_surface.fill((30, 30, 30))
-    pygame.draw.lines(virtual_surface, (100,255,100), False, PATH, 8)
+    for tower in towers:
+        tower.update()
+        for enemy in enemies:
+            dx, dy = enemy.pos[0] - tower.x, enemy.pos[1] - tower.y
+            if dx ** 2 + dy ** 2 < tower.range ** 2 and tower.can_shoot():
+                bullets.append(tower.shoot(enemy))
+                break
+
+    for bullet in bullets[:]:
+        bullet.move()
+        if bullet.hit():
+            if bullet.target in enemies:
+                enemies.remove(bullet.target)
+                score += 1
+            bullets.remove(bullet)
+
+    # Drawing
+    bg_color = (30, 30, 30) if not invert else (225, 225, 225)
+    virtual_surface.fill(bg_color)
+
+    # Draw path
+    path_color = (0, 255, 0) if not invert else invert_color((0, 255, 0))
+    pygame.draw.lines(virtual_surface, path_color, False, PATH, 8)
+
     for tower in towers:
         tower.draw(virtual_surface)
-    for e in enemies:
-        e.draw(virtual_surface)
-    for b in bullets:
-        b.draw(virtual_surface)
+    for enemy in enemies:
+        enemy.draw(virtual_surface)
+    for bullet in bullets:
+        bullet.draw(virtual_surface)
 
-    font = pygame.font.SysFont(None, 32)
-    txt = font.render(f"Lives: {lives}  Score: {score}", True, (255,255,255))
-    virtual_surface.blit(txt, (10,10))
+    # HUD
+    fg = (255, 255, 255) if not invert else (0, 0, 0)
+    text = font.render(f"Lives: {lives}  Score: {score}", True, fg)
+    virtual_surface.blit(text, (10, 10))
+    small = small_font.render("ESC to quit, click to place towers", True, fg)
+    virtual_surface.blit(small, (10, 50))
 
-    if lives <= 0:
-        txt = font.render("Game Over!", True, (255,0,0))
-        virtual_surface.blit(txt, (320, 200))
-        pygame.display.flip()
-        pygame.time.wait(2000)
-        break
-    elif score >= 10:
-        txt = font.render("You Win!", True, (0,255,0))
-        virtual_surface.blit(txt, (340, 200))
-        pygame.display.flip()
-        pygame.time.wait(2000)
-        break
-
-    scale = min(SCREEN_WIDTH / VIRTUAL_WIDTH, SCREEN_HEIGHT / VIRTUAL_HEIGHT)
-    new_width = int(VIRTUAL_WIDTH * scale)
-    new_height = int(VIRTUAL_HEIGHT * scale)
-    scaled_surface = pygame.transform.smoothscale(virtual_surface, (new_width, new_height))
-    x_offset = (SCREEN_WIDTH - new_width) // 2
-    y_offset = (SCREEN_HEIGHT - new_height) // 2
-    screen.fill((0, 0, 0))
-    screen.blit(scaled_surface, (x_offset, y_offset))
+    # Scale to screen
+    scaled = pygame.transform.scale(virtual_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen.blit(scaled, (0, 0))
     pygame.display.flip()
-    pygame.time.Clock().tick(60)
 
 pygame.quit()
 sys.exit()
