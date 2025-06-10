@@ -146,8 +146,15 @@ while running:
         pygame.time.wait(2000)
         break
 
-    scaled_surface = pygame.transform.smoothscale(virtual_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
-    screen.blit(scaled_surface, (0, 0))
+    # Calculate scale factor and position for aspect ratio preservation
+    scale = min(SCREEN_WIDTH / VIRTUAL_WIDTH, SCREEN_HEIGHT / VIRTUAL_HEIGHT)
+    new_width = int(VIRTUAL_WIDTH * scale)
+    new_height = int(VIRTUAL_HEIGHT * scale)
+    scaled_surface = pygame.transform.smoothscale(virtual_surface, (new_width, new_height))
+    x_offset = (SCREEN_WIDTH - new_width) // 2
+    y_offset = (SCREEN_HEIGHT - new_height) // 2
+    screen.fill((0, 0, 0))  # Fill background for letterboxing
+    screen.blit(scaled_surface, (x_offset, y_offset))
     pygame.display.flip()
     pygame.time.Clock().tick(60)
 
