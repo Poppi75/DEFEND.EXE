@@ -29,7 +29,8 @@ while running:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if button_text_rect.collidepoint(event.pos):
-                subprocess.Popen([sys.executable, "testi.py"])
+                # Launch level_select.py instead of testi.py
+                subprocess.Popen([sys.executable, "level_select.py"])
                 running = False
             elif quit_text_rect.collidepoint(event.pos):
                 running = False
