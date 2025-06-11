@@ -39,7 +39,9 @@ bullets = []
 lives = 3
 score = 0
 
-PATH = [(100, 400), (400, 400), (400, 700), (1000, 700), (1000, 100)]
+PATH = [(0, 400), (400, 400), (400, 700), (1000, 700), (1000, 100), 
+        (1600, 100), (1600, 250), (1350, 250), (1350, 650), 
+        (1600, 650), (1600, 900), (800, 900), (800, 1100)]
 
 settings = load_settings()
 invert = settings.get("invert_colors", False)
@@ -47,10 +49,38 @@ invert = settings.get("invert_colors", False)
 MENU_WIDTH = 120
 MENU_BG = (50, 50, 80)
 TOWER_TYPES = [
-    {"name": "Blue", "color": (0, 0, 200), "range": 120},
-    {"name": "Red", "color": (200, 0, 0), "range": 80},
-    {"name": "Green", "color": (0, 180, 0), "range": 160},
-    {"name": "Yellow", "color": (200, 200, 0), "range": 100},
+    {
+        "name": "Blue",
+        "color": (0, 0, 200),
+        "range": 140,
+        "cooldown": 60,
+        "fire_rate": 60,
+        "acquire_delay": int(1.5 * 60),
+    },
+    {
+        "name": "Red",
+        "color": (200, 0, 0),
+        "range": 70,
+        "cooldown": 30,
+        "fire_rate": 30,
+        "acquire_delay": int(1.0 * 60),
+    },
+    {
+        "name": "Green",
+        "color": (0, 180, 0),
+        "range": 180,
+        "cooldown": 90,
+        "fire_rate": 90,
+        "acquire_delay": int(2.0 * 60),
+    },
+    {
+        "name": "Yellow",
+        "color": (200, 200, 0),
+        "range": 100,
+        "cooldown": 45,
+        "fire_rate": 45,
+        "acquire_delay": int(1.2 * 60),
+    },
 ]
 
 class Tower:
@@ -58,8 +88,10 @@ class Tower:
         self.x, self.y = x, y
         self.type = ttype
         self.range = TOWER_TYPES[ttype]["range"]
-        self.cooldown = 0
-        self.fire_rate = 30
+        self.cooldown = TOWER_TYPES[ttype]["cooldown"]
+        self.fire_rate = TOWER_TYPES[ttype]["fire_rate"]
+        self.acquire_delay = TOWER_TYPES[ttype]["acquire_delay"]
+        self.target = None  # Track the current target
 
     def draw(self, surf):
         color = TOWER_TYPES[self.type]["color"]
@@ -74,17 +106,36 @@ class Tower:
         )
 
     def shoot(self, enemies, bullets):
+        # If the current target is gone or out of range, reset target
+        if self.target not in enemies or (
+            self.target and math.hypot(self.target.pos[0] - self.x, self.target.pos[1] - self.y) > self.range
+        ):
+            self.target = None
+            self.acquire_delay = 0  # Reset delay if target lost
+
         if self.cooldown > 0:
             self.cooldown -= 1
             return
-        for enemy in enemies:
-            dx = enemy.pos[0] - self.x
-            dy = enemy.pos[1] - self.y
-            dist = math.hypot(dx, dy)
-            if dist <= self.range:
-                bullets.append(Bullet(self.x, self.y, enemy))
+
+        if self.target is None:
+            # Acquire a new target
+            for enemy in enemies:
+                dx = enemy.pos[0] - self.x
+                dy = enemy.pos[1] - self.y
+                dist = math.hypot(dx, dy)
+                if dist <= self.range:
+                    self.target = enemy
+                    self.acquire_delay = int(1.5 * 60)  # 1.5 seconds at 60 FPS
+                    break
+
+        if self.target:
+            if self.acquire_delay > 0:
+                self.acquire_delay -= 1
+                return
+            # Shoot only if not already shot at this target (no bullet in flight)
+            if not any(bullet.target == self.target and bullet.x == self.x and bullet.y == self.y for bullet in bullets):
+                bullets.append(Bullet(self.x, self.y, self.target))
                 self.cooldown = self.fire_rate
-                break
 
 class Enemy:
     def __init__(self, path):
@@ -147,6 +198,10 @@ pause_button_rect = pygame.Rect(
 )
 paused = False
 
+placing_tower = False
+placement_preview = None  # (x, y, ttype)
+dragging = False
+
 def draw_pause_menu(surface):
     overlay = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))
@@ -185,6 +240,29 @@ def draw_pause_menu(surface):
 
     return resume_rect, settings_rect, restart_rect, mainmenu_rect
 
+def is_valid_tower_position(x, y, ttype):
+    # Prevent overlap with other towers
+    for tower in towers:
+        if math.hypot(tower.x - x, tower.y - y) < 40:  # 40 is tower width
+            return False
+    # Prevent placement on path (check distance to each path segment)
+    for i in range(len(PATH) - 1):
+        x1, y1 = PATH[i]
+        x2, y2 = PATH[i + 1]
+        # Distance from point to segment
+        px, py = x, y
+        dx, dy = x2 - x1, y2 - y1
+        if dx == dy == 0:
+            dist = math.hypot(px - x1, py - y1)
+        else:
+            t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)))
+            proj_x = x1 + t * dx
+            proj_y = y1 + t * dy
+            dist = math.hypot(px - proj_x, py - proj_y)
+        if dist < 40:  # 40 is tower width
+            return False
+    return True
+
 running = True
 while running:
     for event in pygame.event.get():
@@ -221,15 +299,51 @@ while running:
 
             if not paused:
                 menu_left = VIRTUAL_WIDTH - MENU_WIDTH
-                if vx >= menu_left:
-                    menu_y = 60
-                    for i, ttype in enumerate(TOWER_TYPES):
-                        rect = pygame.Rect(menu_left + 10, menu_y + i * 70, 100, 60)
-                        if rect.collidepoint(vx, vy):
-                            selected_tower_type = i
-                elif selected_tower_type is not None:
-                    towers.append(Tower(vx, vy, selected_tower_type))
-                    selected_tower_type = None
+                menu_y = 60
+                if not placing_tower:
+                    # Select tower type from menu
+                    if vx >= menu_left:
+                        for i, ttype in enumerate(TOWER_TYPES):
+                            rect = pygame.Rect(menu_left + 10, menu_y + i * 70, 100, 60)
+                            if rect.collidepoint(vx, vy):
+                                selected_tower_type = i
+                    elif selected_tower_type is not None:
+                        # Start placement preview
+                        placing_tower = True
+                        placement_preview = [vx, vy, selected_tower_type]
+                        dragging = True
+                        selected_tower_type = None
+                else:
+                    # If already placing, check if clicked accept/cancel
+                    accept_rect = pygame.Rect(placement_preview[0] + 50, placement_preview[1] - 30, 80, 40)
+                    cancel_rect = pygame.Rect(placement_preview[0] - 130, placement_preview[1] - 30, 80, 40)
+                    if accept_rect.collidepoint(vx, vy):
+                        if is_valid_tower_position(placement_preview[0], placement_preview[1], placement_preview[2]):
+                            towers.append(Tower(placement_preview[0], placement_preview[1], placement_preview[2]))
+                            placing_tower = False
+                            placement_preview = None
+                            dragging = False
+                        # else: do nothing, keep preview active
+                    elif cancel_rect.collidepoint(vx, vy):
+                        placing_tower = False
+                        placement_preview = None
+                        dragging = False
+                    else:
+                        # Start dragging if clicked on the preview tower
+                        tower_rect = pygame.Rect(placement_preview[0] - 20, placement_preview[1] - 20, 40, 40)
+                        if tower_rect.collidepoint(vx, vy):
+                            dragging = True
+
+        elif event.type == pygame.MOUSEBUTTONUP:
+            dragging = False
+
+        elif event.type == pygame.MOUSEMOTION:
+            if placing_tower and dragging:
+                mx, my = pygame.mouse.get_pos()
+                vx = int(mx * VIRTUAL_WIDTH / SCREEN_WIDTH)
+                vy = int(my * VIRTUAL_HEIGHT / SCREEN_HEIGHT)
+                placement_preview[0] = vx
+                placement_preview[1] = vy
 
     if not paused:
         enemy_spawn_timer += 1
@@ -298,6 +412,35 @@ while running:
     y = pause_button_rect.y + (pause_button_rect.height - bar_height) // 2
     pygame.draw.rect(virtual_surface, bar_color, (x1, y, bar_width, bar_height), border_radius=8)
     pygame.draw.rect(virtual_surface, bar_color, (x2, y, bar_width, bar_height), border_radius=8)
+
+    # Draw placement preview if needed
+    if placing_tower and placement_preview:
+        px, py, ttype = placement_preview
+        valid = is_valid_tower_position(px, py, ttype)
+        # Change preview color based on validity
+        if valid:
+            preview_color = TOWER_TYPES[ttype]["color"] if not invert else invert_color(TOWER_TYPES[ttype]["color"])
+            radius_color = (100, 100, 255) if not invert else invert_color((100, 100, 255))
+        else:
+            preview_color = (200, 50, 50) if not invert else invert_color((200, 50, 50))
+            radius_color = (200, 50, 50) if not invert else invert_color((200, 50, 50))
+        pygame.draw.rect(virtual_surface, preview_color, (px - 20, py - 20, 40, 40), 2)
+        pygame.draw.circle(
+            virtual_surface,
+            radius_color,
+            (px, py),
+            TOWER_TYPES[ttype]["range"],
+            1,
+        )
+        # Accept and Cancel buttons
+        accept_rect = pygame.Rect(px + 50, py - 30, 80, 40)
+        cancel_rect = pygame.Rect(px - 130, py - 30, 80, 40)
+        pygame.draw.rect(virtual_surface, (0, 200, 0), accept_rect)
+        pygame.draw.rect(virtual_surface, (200, 0, 0), cancel_rect)
+        accept_label = small_font.render("Accept", True, (255, 255, 255))
+        cancel_label = small_font.render("Cancel", True, (255, 255, 255))
+        virtual_surface.blit(accept_label, (px + 60, py - 22))
+        virtual_surface.blit(cancel_label, (px - 120, py - 22))
 
     if paused:
         draw_pause_menu(virtual_surface)
