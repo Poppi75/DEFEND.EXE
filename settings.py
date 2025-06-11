@@ -55,9 +55,7 @@ while running:
                 save_settings(settings)
                 invert_text, back_text = update_texts()
             elif back_rect.collidepoint(event.pos):
-                import subprocess
-                import sys
-                subprocess.Popen([sys.executable, "Start-Menu.py"])
+                # Just close this window, don't open main menu
                 running = False
 
     bg_color = (30, 30, 30) if not invert else (225, 225, 225)

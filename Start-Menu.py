@@ -69,8 +69,22 @@ while running:
                 save_settings(settings)
                 running = False
             elif settings_text_rect.collidepoint(event.pos):
-                subprocess.Popen([sys.executable, "settings.py"])
-                running = False
+                subprocess.call([sys.executable, "settings.py"])
+                # Reload settings and update invert variable
+                settings = load_settings()
+                invert = settings.get("invert_colors", False)
+                # Update colors and background
+                fg = (255, 255, 255) if not invert else (0, 0, 0)
+                background = pygame.image.load("background.png")
+                background = pygame.transform.scale(background, (screen_width, screen_height))
+                if invert:
+                    background = invert_surface(background)
+                button_text = font.render("Start", True, fg)
+                button_text_rect = button_text.get_rect(center=(screen_width // 2, screen_height // 2 - 80 + 100))
+                settings_text = font.render("Settings", True, fg)
+                settings_text_rect = settings_text.get_rect(center=(screen_width // 2, screen_height // 2 + 0 + 100))
+                quit_text = font.render("Quit", True, fg)
+                quit_text_rect = quit_text.get_rect(center=(screen_width // 2, screen_height // 2 + 80 + 100))
 
     screen.blit(background, (0, 0))
     screen.blit(button_text, button_text_rect)
