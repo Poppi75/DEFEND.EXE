@@ -24,6 +24,7 @@ pygame.display.set_caption("Level Select")
 
 settings = load_settings()
 invert = settings.get("invert_colors", False)
+unlocked_levels = settings.get("unlocked_levels", 1)
 
 font = pygame.font.SysFont(None, 60)
 small_font = pygame.font.SysFont(None, 40)
@@ -37,7 +38,7 @@ start_x = (screen_width - (button_width * 5 + gap * 4)) // 2
 start_y = screen_height // 2 - button_height - gap // 2
 
 # Only level 1 is unlocked
-unlocked_levels = 1
+# unlocked_levels = 1
 
 # Create level button rects and labels
 for i in range(levels):
