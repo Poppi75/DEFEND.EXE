@@ -5,6 +5,7 @@ import math
 import json
 import os
 import subprocess
+import random
 
 SETTINGS_FILE = "settings.json"
 
@@ -14,6 +15,10 @@ def load_settings():
             return json.load(f)
     return {"invert_colors": False}
 
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(settings, f)
+
 def invert_color(color):
     if len(color) == 3:
         return tuple(255 - c for c in color)
@@ -21,6 +26,12 @@ def invert_color(color):
         return tuple(255 - c for c in color[:3]) + (color[3],)
     else:
         return color
+
+def unlock_level(level):
+    settings = load_settings()
+    if "unlocked_levels" not in settings or settings["unlocked_levels"] < level:
+        settings["unlocked_levels"] = level
+        save_settings(settings)
 
 pygame.init()
 
@@ -32,6 +43,7 @@ virtual_surface = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
 
 font = pygame.font.SysFont("Arial", 32)
 small_font = pygame.font.SysFont("Arial", 20)
+big_font = pygame.font.SysFont("Arial", 80)
 
 towers = []
 enemies = []
@@ -91,7 +103,7 @@ class Tower:
         self.cooldown = TOWER_TYPES[ttype]["cooldown"]
         self.fire_rate = TOWER_TYPES[ttype]["fire_rate"]
         self.acquire_delay = TOWER_TYPES[ttype]["acquire_delay"]
-        self.target = None  # Track the current target
+        self.target = None
 
     def draw(self, surf):
         color = TOWER_TYPES[self.type]["color"]
@@ -106,33 +118,30 @@ class Tower:
         )
 
     def shoot(self, enemies, bullets):
-        # If the current target is gone or out of range, reset target
         if self.target not in enemies or (
             self.target and math.hypot(self.target.pos[0] - self.x, self.target.pos[1] - self.y) > self.range
         ):
             self.target = None
-            self.acquire_delay = 0  # Reset delay if target lost
+            self.acquire_delay = 0
 
         if self.cooldown > 0:
             self.cooldown -= 1
             return
 
         if self.target is None:
-            # Acquire a new target
             for enemy in enemies:
                 dx = enemy.pos[0] - self.x
                 dy = enemy.pos[1] - self.y
                 dist = math.hypot(dx, dy)
                 if dist <= self.range:
                     self.target = enemy
-                    self.acquire_delay = int(1.5 * 60)  # 1.5 seconds at 60 FPS
+                    self.acquire_delay = int(1.5 * 60)
                     break
 
         if self.target:
             if self.acquire_delay > 0:
                 self.acquire_delay -= 1
                 return
-            # Shoot only if not already shot at this target (no bullet in flight)
             if not any(bullet.target == self.target and bullet.x == self.x and bullet.y == self.y for bullet in bullets):
                 bullets.append(Bullet(self.x, self.y, self.target))
                 self.cooldown = self.fire_rate
@@ -142,7 +151,8 @@ class Enemy:
         self.path = path
         self.pos = list(path[0])
         self.path_index = 0
-        self.speed = 2
+        self.speed = 1  # Slower base enemy
+        self.hp = 1
 
     def update(self):
         if self.path_index < len(self.path) - 1:
@@ -159,6 +169,27 @@ class Enemy:
     def draw(self, surf):
         color = (255, 0, 0) if not invert else invert_color((255, 0, 0))
         pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 20)
+
+class FastEnemy(Enemy):
+    def __init__(self, path):
+        super().__init__(path)
+        self.speed = 2  # Faster
+
+    def draw(self, surf):
+        color = (0, 200, 255) if not invert else invert_color((0, 200, 255))
+        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 18)
+
+class DurableEnemy(Enemy):
+    def __init__(self, path):
+        super().__init__(path)
+        self.hp = 3
+        self.speed = 1
+
+    def draw(self, surf):
+        color = (128, 0, 128) if not invert else invert_color((128, 0, 128))
+        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 24)
+        hp_label = small_font.render(str(self.hp), True, (255,255,255) if not invert else (0,0,0))
+        surf.blit(hp_label, (int(self.pos[0])-10, int(self.pos[1])-10))
 
 class Bullet:
     def __init__(self, x, y, target):
@@ -191,41 +222,58 @@ selected_tower_type = None
 # Pause button in bottom right, bigger
 pause_button_size = 100
 pause_button_rect = pygame.Rect(
-    VIRTUAL_WIDTH - pause_button_size - 40,
-    VIRTUAL_HEIGHT - pause_button_size - 40,
+    VIRTUAL_WIDTH - pause_button_size - 10,
+    VIRTUAL_HEIGHT - pause_button_size - 10,
     pause_button_size,
     pause_button_size
 )
 paused = False
 
 placing_tower = False
-placement_preview = None  # (x, y, ttype)
+placement_preview = None
 dragging = False
+
+# --- Wave system ---
+current_wave = 1
+max_wave = 3
+enemies_to_spawn = []
+spawn_cooldown = 0
+wave_in_progress = False
+game_won = False
+game_lost = False
+
+def setup_wave(wave):
+    if wave == 1:
+        wave_list = [Enemy(PATH) for _ in range(15)]
+    elif wave == 2:
+        wave_list = [Enemy(PATH) for _ in range(15)] + [FastEnemy(PATH) for _ in range(5)]
+    elif wave == 3:
+        wave_list = [Enemy(PATH) for _ in range(15)] + [FastEnemy(PATH) for _ in range(10)] + [DurableEnemy(PATH) for _ in range(5)]
+    else:
+        wave_list = []
+    random.shuffle(wave_list)
+    return wave_list
 
 def draw_pause_menu(surface):
     overlay = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))
     surface.blit(overlay, (0, 0))
 
-    # Button rects
     resume_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 - 120, 240, 60)
     settings_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 - 40, 240, 60)
     restart_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 + 40, 240, 60)
     mainmenu_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 + 120, 240, 60)
 
-    # Button colors (invert if needed)
     resume_color = (100, 200, 100) if not invert else invert_color((100, 200, 100))
     settings_color = (100, 100, 255) if not invert else invert_color((100, 100, 255))
     restart_color = (200, 200, 0) if not invert else invert_color((200, 200, 0))
     mainmenu_color = (200, 0, 0) if not invert else invert_color((200, 0, 0))
 
-    # Draw buttons
     pygame.draw.rect(surface, resume_color, resume_rect)
     pygame.draw.rect(surface, settings_color, settings_rect)
     pygame.draw.rect(surface, restart_color, restart_rect)
     pygame.draw.rect(surface, mainmenu_color, mainmenu_rect)
 
-    # Text color (invert if needed)
     text_color = (255, 255, 255) if not invert else (0, 0, 0)
 
     resume_label = font.render("Resume", True, text_color)
@@ -241,15 +289,12 @@ def draw_pause_menu(surface):
     return resume_rect, settings_rect, restart_rect, mainmenu_rect
 
 def is_valid_tower_position(x, y, ttype):
-    # Prevent overlap with other towers
     for tower in towers:
-        if math.hypot(tower.x - x, tower.y - y) < 40:  # 40 is tower width
+        if math.hypot(tower.x - x, tower.y - y) < 40:
             return False
-    # Prevent placement on path (check distance to each path segment)
     for i in range(len(PATH) - 1):
         x1, y1 = PATH[i]
         x2, y2 = PATH[i + 1]
-        # Distance from point to segment
         px, py = x, y
         dx, dy = x2 - x1, y2 - y1
         if dx == dy == 0:
@@ -259,7 +304,7 @@ def is_valid_tower_position(x, y, ttype):
             proj_x = x1 + t * dx
             proj_y = y1 + t * dy
             dist = math.hypot(px - proj_x, py - proj_y)
-        if dist < 40:  # 40 is tower width
+        if dist < 40:
             return False
     return True
 
@@ -297,24 +342,21 @@ while running:
                     subprocess.Popen([sys.executable, "Start-Menu.py"])
                     running = False
 
-            if not paused:
+            if not paused and not game_won and not game_lost:
                 menu_left = VIRTUAL_WIDTH - MENU_WIDTH
                 menu_y = 60
                 if not placing_tower:
-                    # Select tower type from menu
                     if vx >= menu_left:
                         for i, ttype in enumerate(TOWER_TYPES):
                             rect = pygame.Rect(menu_left + 10, menu_y + i * 70, 100, 60)
                             if rect.collidepoint(vx, vy):
                                 selected_tower_type = i
                     elif selected_tower_type is not None:
-                        # Start placement preview
                         placing_tower = True
                         placement_preview = [vx, vy, selected_tower_type]
                         dragging = True
                         selected_tower_type = None
                 else:
-                    # If already placing, check if clicked accept/cancel
                     accept_rect = pygame.Rect(placement_preview[0] + 50, placement_preview[1] - 30, 80, 40)
                     cancel_rect = pygame.Rect(placement_preview[0] - 130, placement_preview[1] - 30, 80, 40)
                     if accept_rect.collidepoint(vx, vy):
@@ -323,13 +365,11 @@ while running:
                             placing_tower = False
                             placement_preview = None
                             dragging = False
-                        # else: do nothing, keep preview active
                     elif cancel_rect.collidepoint(vx, vy):
                         placing_tower = False
                         placement_preview = None
                         dragging = False
                     else:
-                        # Start dragging if clicked on the preview tower
                         tower_rect = pygame.Rect(placement_preview[0] - 20, placement_preview[1] - 20, 40, 40)
                         if tower_rect.collidepoint(vx, vy):
                             dragging = True
@@ -345,12 +385,27 @@ while running:
                 placement_preview[0] = vx
                 placement_preview[1] = vy
 
-    if not paused:
-        enemy_spawn_timer += 1
-        if enemy_spawn_timer >= enemy_spawn_interval:
-            enemies.append(Enemy(PATH))
-            enemy_spawn_timer = 0
+    # --- Wave logic ---
+    if not wave_in_progress and not enemies and not enemies_to_spawn and not game_won and not game_lost:
+        if current_wave <= max_wave:
+            enemies_to_spawn = setup_wave(current_wave)
+            wave_in_progress = True
+            spawn_cooldown = 0
+        else:
+            game_won = True
 
+    if wave_in_progress and enemies_to_spawn and not game_won and not game_lost:
+        spawn_cooldown -= 1
+        if spawn_cooldown <= 0:
+            enemy = enemies_to_spawn.pop(0)
+            enemies.append(enemy)
+            spawn_cooldown = 30
+
+    if wave_in_progress and not enemies_to_spawn and not enemies and not game_won and not game_lost:
+        current_wave += 1
+        wave_in_progress = False
+
+    if not paused and not game_won and not game_lost:
         for tower in towers:
             tower.shoot(enemies, bullets)
 
@@ -358,12 +413,19 @@ while running:
             bullet.update()
             if bullet.target and math.hypot(bullet.x - bullet.target.pos[0], bullet.y - bullet.target.pos[1]) < bullet.radius + 20:
                 if bullet.target in enemies:
-                    enemies.remove(bullet.target)
-                    score += 1
+                    bullet.target.hp -= 1
+                    if bullet.target.hp <= 0:
+                        enemies.remove(bullet.target)
+                        score += 1
                 bullets.remove(bullet)
 
-        for enemy in enemies:
+        for enemy in enemies[:]:
             enemy.update()
+            if enemy.path_index == len(enemy.path) - 1:
+                enemies.remove(enemy)
+                lives -= 1
+                if lives <= 0:
+                    game_lost = True
 
     bg_color = (30, 30, 30) if not invert else (225, 225, 225)
     virtual_surface.fill(bg_color)
@@ -381,8 +443,10 @@ while running:
     fg = (255, 255, 255) if not invert else (0, 0, 0)
     text = font.render(f"Lives: {lives}  Score: {score}", True, fg)
     virtual_surface.blit(text, (10, 10))
+    wave_label = font.render(f"Wave: {min(current_wave, max_wave)}", True, fg)
+    virtual_surface.blit(wave_label, (10, 50))
     small = small_font.render("ESC to quit, click to place towers", True, fg)
-    virtual_surface.blit(small, (10, 50))
+    virtual_surface.blit(small, (10, 90))
 
     menu_left = VIRTUAL_WIDTH - MENU_WIDTH
     pygame.draw.rect(virtual_surface, MENU_BG, (menu_left, 0, MENU_WIDTH, VIRTUAL_HEIGHT))
@@ -417,7 +481,6 @@ while running:
     if placing_tower and placement_preview:
         px, py, ttype = placement_preview
         valid = is_valid_tower_position(px, py, ttype)
-        # Change preview color based on validity
         if valid:
             preview_color = TOWER_TYPES[ttype]["color"] if not invert else invert_color(TOWER_TYPES[ttype]["color"])
             radius_color = (100, 100, 255) if not invert else invert_color((100, 100, 255))
@@ -432,7 +495,6 @@ while running:
             TOWER_TYPES[ttype]["range"],
             1,
         )
-        # Accept and Cancel buttons
         accept_rect = pygame.Rect(px + 50, py - 30, 80, 40)
         cancel_rect = pygame.Rect(px - 130, py - 30, 80, 40)
         pygame.draw.rect(virtual_surface, (0, 200, 0), accept_rect)
@@ -444,6 +506,67 @@ while running:
 
     if paused:
         draw_pause_menu(virtual_surface)
+
+    # WIN/LOSE SCENES
+    if game_won:
+        win_text = big_font.render("You Win!", True, (0, 255, 0))
+        text_rect = win_text.get_rect(midtop=(VIRTUAL_WIDTH//2, 60))
+        # Draw black background rectangle (with some padding)
+        bg_rect = pygame.Rect(text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20)
+        pygame.draw.rect(virtual_surface, (0, 0, 0), bg_rect)
+        virtual_surface.blit(win_text, text_rect)
+        unlock_level(2)
+        scaled = pygame.transform.scale(virtual_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        screen.blit(scaled, (0, 0))
+        pygame.display.flip()
+        pygame.time.wait(2000)
+        subprocess.Popen([sys.executable, "level_select.py"])
+        break
+
+    if game_lost:
+        lose_text = big_font.render("You Lose!", True, (255, 0, 0))
+        text_rect = lose_text.get_rect(midtop=(VIRTUAL_WIDTH//2, 60))
+        bg_rect = pygame.Rect(text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20)
+        pygame.draw.rect(virtual_surface, (0, 0, 0), bg_rect)
+        virtual_surface.blit(lose_text, text_rect)
+        restart_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 + 10, 240, 60)
+        levelselect_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 + 90, 240, 60)
+        mainmenu_rect = pygame.Rect(VIRTUAL_WIDTH//2 - 120, VIRTUAL_HEIGHT//2 + 170, 240, 60)
+        pygame.draw.rect(virtual_surface, (100, 200, 100), restart_rect)
+        pygame.draw.rect(virtual_surface, (100, 100, 255), levelselect_rect)
+        pygame.draw.rect(virtual_surface, (200, 0, 0), mainmenu_rect)
+        restart_label = font.render("Restart", True, (255,255,255))
+        levelselect_label = font.render("Level Select", True, (255,255,255))
+        mainmenu_label = font.render("Main Menu", True, (255,255,255))
+        virtual_surface.blit(restart_label, restart_label.get_rect(center=restart_rect.center))
+        virtual_surface.blit(levelselect_label, levelselect_label.get_rect(center=levelselect_rect.center))
+        virtual_surface.blit(mainmenu_label, mainmenu_label.get_rect(center=mainmenu_rect.center))
+        scaled = pygame.transform.scale(virtual_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        screen.blit(scaled, (0, 0))
+        pygame.display.flip()
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    mx, my = pygame.mouse.get_pos()
+                    vx = int(mx * VIRTUAL_WIDTH / SCREEN_WIDTH)
+                    vy = int(my * VIRTUAL_HEIGHT / SCREEN_HEIGHT)
+                    if restart_rect.collidepoint(vx, vy):
+                        subprocess.Popen([sys.executable, "level1.py"])
+                        waiting = False
+                        running = False
+                    elif levelselect_rect.collidepoint(vx, vy):
+                        subprocess.Popen([sys.executable, "level_select.py"])
+                        waiting = False
+                        running = False
+                    elif mainmenu_rect.collidepoint(vx, vy):
+                        subprocess.Popen([sys.executable, "Start-Menu.py"])
+                        waiting = False
+                        running = False
+        break
 
     scaled = pygame.transform.scale(virtual_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
     screen.blit(scaled, (0, 0))
