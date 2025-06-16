@@ -33,6 +33,70 @@ def unlock_level(level):
         settings["unlocked_levels"] = level
         save_settings(settings)
 
+# --- PUZZLES ---
+PUZZLES = [
+    {
+        "question": "A scanner checks 60 files. Every 4th file is marked suspicious. Every 6th file is marked critical.\nHow many files are marked both suspicious and critical?",
+        "options": [
+            "10",
+            "15",
+            "5",
+            "20"
+        ],
+        "answer": 0  # 10
+    },
+    {
+        "question": "You have three virus names: WormX, BugZ, and TrojY.\n\n    BugZ always appears after WormX.\n    TrojY never appears with BugZ.\nIf BugZ is detected, which virus cannot be present?",
+        "options": [
+            "WormX",
+            "TrojY",
+            "BugZ",
+            "None"
+        ],
+        "answer": 1  # TrojY
+    },
+    {
+        "question": "What’s wrong with this Python code?\n\nif virusDetected = True:\n    quarantine()",
+        "options": [
+            "if should be while",
+            "Missing :",
+            "= should be ==",
+            "The function quarantine is misspelled"
+        ],
+        "answer": 2  # = should be ==
+    },
+    {
+        "question": "What will this code do?\n\nwhile True:\n    print(\"Scanning...\")",
+        "options": [
+            "Scan 100 files",
+            "Run forever",
+            "Run once",
+            "Give an error"
+        ],
+        "answer": 1  # Run forever
+    },
+    {
+        "question": "Your backup fails if either of these are true:\n    Disk is full\n    Network is disconnected\nWhich condition correctly triggers the backup failure?",
+        "options": [
+            "if disk_full and network_connected:",
+            "if disk_full or not network_connected:",
+            "if not disk_full and not network_connected:",
+            "if not disk_full or network_connected:"
+        ],
+        "answer": 1  # if disk_full or not network_connected:
+    },
+    {
+        "question": "CPU temperature is too high if it’s over 80°C and the CPU load is over 90%.\nWhich condition should be used?",
+        "options": [
+            "if temp > 80 or load > 90:",
+            "if temp > 80 and load > 90:",
+            "if temp < 80 and load < 90:",
+            "if temp > 80:"
+        ],
+        "answer": 1  # if temp > 80 and load > 90:
+    }
+]
+
 pygame.init()
 
 info = pygame.display.Info()
@@ -94,6 +158,14 @@ TOWER_TYPES = [
         "acquire_delay": int(1.2 * 60),
     },
 ]
+
+# --- Puzzle state ---
+puzzle_active = False
+current_puzzle = None
+puzzle_result = None  # None, True, or False
+puzzle_option_rects = []
+last_puzzle_index = None  # For random puzzle selection
+tower_place_cooldowns = [0 for _ in TOWER_TYPES]  # Per-tower-type cooldown
 
 class Tower:
     def __init__(self, x, y, ttype=0):
@@ -244,6 +316,7 @@ current_wave = 1
 max_wave = 3
 enemies_to_spawn = []
 spawn_cooldown = 0
+next_enemy_spawn_offset = 0  # <-- Add this line
 wave_in_progress = False
 game_won = False
 game_lost = False
@@ -258,6 +331,9 @@ def setup_wave(wave):
     else:
         wave_list = []
     random.shuffle(wave_list)
+    # Add spawn_offset to each enemy so they spawn apart
+    for i, enemy in enumerate(wave_list):
+        enemy.spawn_offset = i * 20  # 20 frames apart, adjust as needed
     return wave_list
 
 def draw_pause_menu(surface):
@@ -294,6 +370,20 @@ def draw_pause_menu(surface):
 
     return resume_rect, settings_rect, restart_rect, mainmenu_rect
 
+# Helper to shuffle puzzle options and update answer index
+def get_shuffled_puzzle(puzzle):
+    options = list(puzzle["options"])
+    answer = puzzle["answer"]
+    zipped = list(enumerate(options))
+    random.shuffle(zipped)
+    new_options = [opt for idx, opt in zipped]
+    new_answer = [i for i, (orig_idx, _) in enumerate(zipped) if orig_idx == answer][0]
+    return {
+        "question": puzzle["question"] + "\n\n(Options change places each time!)",
+        "options": new_options,
+        "answer": new_answer
+    }
+
 def is_valid_tower_position(x, y, ttype):
     for tower in towers:
         if math.hypot(tower.x - x, tower.y - y) < 40:
@@ -302,7 +392,7 @@ def is_valid_tower_position(x, y, ttype):
         x1, y1 = PATH[i]
         x2, y2 = PATH[i + 1]
         px, py = x, y
-        dx, dy = x2 - x1, y2 - y1
+        dx, dy = x2 - x1, y2 - y1  # <-- FIXED HERE
         if dx == dy == 0:
             dist = math.hypot(px - x1, py - y1)
         else:
@@ -317,6 +407,39 @@ def is_valid_tower_position(x, y, ttype):
 running = True
 while running:
     for event in pygame.event.get():
+        # --- Puzzle answer handling ---
+        if puzzle_active and current_puzzle and event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            vx = int(mx * VIRTUAL_WIDTH / SCREEN_WIDTH)
+            vy = int(my * VIRTUAL_HEIGHT / SCREEN_HEIGHT)
+            for idx, opt_rect in enumerate(puzzle_option_rects):
+                if opt_rect.collidepoint(vx, vy):
+                    ttype = 0
+                    if idx == current_puzzle["answer"]:
+                        ttype = 0
+                        if is_valid_tower_position(placement_preview[0], placement_preview[1], ttype):
+                            towers.append(Tower(placement_preview[0], placement_preview[1], ttype))
+                            puzzle_result = True
+                            placing_tower = False
+                            placement_preview = None
+                            dragging = False
+                            tower_place_cooldowns[0] = 120  # 2 seconds for base tower
+                            puzzle_active = False
+                        else:
+                            puzzle_result = "invalid"
+                            # Re-shuffle puzzle for next attempt
+                            current_puzzle = get_shuffled_puzzle(PUZZLES[last_puzzle_index])
+                            puzzle_active = True
+                            # Do NOT set placing_tower = False, etc.
+                            continue  # Skip rest of event loop for this click
+                    else:
+                        puzzle_result = False
+                        placing_tower = False
+                        placement_preview = None
+                        dragging = False
+                        tower_place_cooldowns[0] = 120  # 2 seconds for base tower
+                        puzzle_active = False
+
         if event.type == pygame.QUIT or (
             event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
         ):
@@ -348,7 +471,7 @@ while running:
                     subprocess.Popen([sys.executable, "Start-Menu.py"])
                     running = False
 
-            if not paused and not game_won and not game_lost:
+            if not paused and not game_won and not game_lost and not puzzle_active:
                 menu_left = VIRTUAL_WIDTH - MENU_WIDTH
                 menu_y = 60
                 if not placing_tower:
@@ -356,7 +479,8 @@ while running:
                         for i, ttype in enumerate(TOWER_TYPES):
                             rect = pygame.Rect(menu_left + 10, menu_y + i * 70, 100, 60)
                             if rect.collidepoint(vx, vy):
-                                selected_tower_type = i
+                                if tower_place_cooldowns[i] == 0:
+                                    selected_tower_type = i
                     elif selected_tower_type is not None:
                         placing_tower = True
                         placement_preview = [vx, vy, selected_tower_type]
@@ -366,11 +490,23 @@ while running:
                     accept_rect = pygame.Rect(placement_preview[0] + 50, placement_preview[1] - 30, 80, 40)
                     cancel_rect = pygame.Rect(placement_preview[0] - 130, placement_preview[1] - 30, 80, 40)
                     if accept_rect.collidepoint(vx, vy):
-                        if is_valid_tower_position(placement_preview[0], placement_preview[1], placement_preview[2]):
-                            towers.append(Tower(placement_preview[0], placement_preview[1], placement_preview[2]))
+                        ttype = placement_preview[2]
+                        if ttype == 0 and not puzzle_active and tower_place_cooldowns[0] == 0:
+                            # Pick a random puzzle, not the same as last time if possible
+                            available = [i for i in range(len(PUZZLES)) if i != last_puzzle_index]
+                            if not available:
+                                available = list(range(len(PUZZLES)))
+                            idx = random.choice(available)
+                            current_puzzle = get_shuffled_puzzle(PUZZLES[idx])
+                            last_puzzle_index = idx
+                            puzzle_active = True
+                            puzzle_result = None
+                        elif is_valid_tower_position(placement_preview[0], placement_preview[1], ttype) and tower_place_cooldowns[ttype] == 0:
+                            towers.append(Tower(placement_preview[0], placement_preview[1], ttype))
                             placing_tower = False
                             placement_preview = None
                             dragging = False
+                            tower_place_cooldowns[ttype] = 120  # 2 seconds
                     elif cancel_rect.collidepoint(vx, vy):
                         placing_tower = False
                         placement_preview = None
@@ -403,9 +539,14 @@ while running:
     if wave_in_progress and enemies_to_spawn and not game_won and not game_lost:
         spawn_cooldown -= 1
         if spawn_cooldown <= 0:
-            enemy = enemies_to_spawn.pop(0)
-            enemies.append(enemy)
-            spawn_cooldown = 30
+            # Only spawn if the next enemy's offset is reached
+            if hasattr(enemies_to_spawn[0], "spawn_offset") and enemies_to_spawn[0].spawn_offset > 0:
+                enemies_to_spawn[0].spawn_offset -= 1
+                spawn_cooldown = 1  # Check again next frame
+            else:
+                enemy = enemies_to_spawn.pop(0)
+                enemies.append(enemy)
+                spawn_cooldown = 30  # base interval between spawns
 
     if wave_in_progress and not enemies_to_spawn and not enemies and not game_won and not game_lost:
         current_wave += 1
@@ -478,6 +619,14 @@ while running:
             pygame.draw.rect(virtual_surface, (255, 255, 255), rect, 3)
         label = small_font.render(ttype["name"], True, fg)
         virtual_surface.blit(label, (menu_left + 20, menu_y + i * 70 + 15))
+        # Draw cooldown overlay if needed
+        if tower_place_cooldowns[i] > 0:
+            cooldown_overlay = pygame.Surface((100, 60), pygame.SRCALPHA)
+            cooldown_overlay.fill((0, 0, 0, 180))
+            virtual_surface.blit(cooldown_overlay, (rect.x, rect.y))
+            cd_text = small_font.render(f"{tower_place_cooldowns[i]//60+1}s", True, (255,255,0))
+            cd_rect = cd_text.get_rect(center=rect.center)
+            virtual_surface.blit(cd_text, cd_rect)
 
     # Draw pause button (bottom right, bigger, thick bars)
     pygame.draw.rect(
@@ -523,6 +672,61 @@ while running:
         virtual_surface.blit(accept_label, (px + 60, py - 22))
         virtual_surface.blit(cancel_label, (px - 120, py - 22))
 
+    # --- Puzzle UI ---
+    if puzzle_active and current_puzzle:
+        # Calculate question height
+        lines = current_puzzle["question"].split('\n')
+        line_height = small_font.get_height() + 4
+        question_height = len(lines) * line_height
+
+        option_height = 40
+        option_spacing = 8
+        total_options_height = len(current_puzzle["options"]) * (option_height + option_spacing)
+
+        padding = 24
+        box_width = 640
+        box_height = padding*2 + question_height + total_options_height
+
+        puzzle_rect = pygame.Rect(
+            VIRTUAL_WIDTH//2 - box_width//2,
+            VIRTUAL_HEIGHT//2 - box_height//2,
+            box_width,
+            box_height
+        )
+        pygame.draw.rect(virtual_surface, (30,30,30), puzzle_rect)
+        pygame.draw.rect(virtual_surface, (200,200,200), puzzle_rect, 3)
+
+        # Draw question
+        for i, line in enumerate(lines):
+            q_text = small_font.render(line, True, (255,255,255))
+            virtual_surface.blit(q_text, (puzzle_rect.x + 20, puzzle_rect.y + padding + i*line_height))
+
+        # Draw options
+        option_rects = []
+        options_start_y = puzzle_rect.y + padding + question_height + 10
+        for i, opt in enumerate(current_puzzle["options"]):
+            opt_rect = pygame.Rect(
+                puzzle_rect.x + 40,
+                options_start_y + i*(option_height + option_spacing),
+                box_width - 80,
+                option_height
+            )
+            pygame.draw.rect(virtual_surface, (80,80,80), opt_rect)
+            pygame.draw.rect(virtual_surface, (200,200,200), opt_rect, 2)
+            # Wrap answer text if too long
+            opt_text = small_font.render(opt, True, (255,255,0))
+            virtual_surface.blit(opt_text, (opt_rect.x + 10, opt_rect.y + 8))
+            option_rects.append(opt_rect)
+        puzzle_option_rects = option_rects
+    elif puzzle_result == "invalid":
+        res_text = font.render("Invalid position!", True, (255,0,0))
+        virtual_surface.blit(res_text, res_text.get_rect(center=(VIRTUAL_WIDTH//2, VIRTUAL_HEIGHT//2)))
+    elif puzzle_result is not None:
+        result_text = "Correct!" if puzzle_result else "Incorrect!"
+        color = (0,255,0) if puzzle_result else (255,0,0)
+        res_text = font.render(result_text, True, color)
+        virtual_surface.blit(res_text, res_text.get_rect(center=(VIRTUAL_WIDTH//2, VIRTUAL_HEIGHT//2)))
+
     if paused:
         draw_pause_menu(virtual_surface)
 
@@ -530,7 +734,6 @@ while running:
     if game_won:
         win_text = big_font.render("You Win!", True, (0, 255, 0))
         text_rect = win_text.get_rect(midtop=(VIRTUAL_WIDTH//2, 60))
-        # Draw black background rectangle (with some padding)
         bg_rect = pygame.Rect(text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20)
         pygame.draw.rect(virtual_surface, (0, 0, 0), bg_rect)
         virtual_surface.blit(win_text, text_rect)
@@ -590,6 +793,13 @@ while running:
     scaled = pygame.transform.scale(virtual_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
     screen.blit(scaled, (0, 0))
     pygame.display.flip()
+
+    # Puzzle cooldown decrement (now per-tower-type)
+    for i in range(len(tower_place_cooldowns)):
+        if tower_place_cooldowns[i] > 0:
+            tower_place_cooldowns[i] -= 1
+    if puzzle_result is not None and tower_place_cooldowns[0] == 0:
+        puzzle_result = None
 
 pygame.quit()
 sys.exit()
