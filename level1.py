@@ -316,6 +316,7 @@ current_wave = 1
 max_wave = 3
 enemies_to_spawn = []
 spawn_cooldown = 0
+next_enemy_spawn_offset = 0  # <-- Add this line
 wave_in_progress = False
 game_won = False
 game_lost = False
@@ -330,6 +331,9 @@ def setup_wave(wave):
     else:
         wave_list = []
     random.shuffle(wave_list)
+    # Add spawn_offset to each enemy so they spawn apart
+    for i, enemy in enumerate(wave_list):
+        enemy.spawn_offset = i * 20  # 20 frames apart, adjust as needed
     return wave_list
 
 def draw_pause_menu(surface):
@@ -535,9 +539,14 @@ while running:
     if wave_in_progress and enemies_to_spawn and not game_won and not game_lost:
         spawn_cooldown -= 1
         if spawn_cooldown <= 0:
-            enemy = enemies_to_spawn.pop(0)
-            enemies.append(enemy)
-            spawn_cooldown = 30
+            # Only spawn if the next enemy's offset is reached
+            if hasattr(enemies_to_spawn[0], "spawn_offset") and enemies_to_spawn[0].spawn_offset > 0:
+                enemies_to_spawn[0].spawn_offset -= 1
+                spawn_cooldown = 1  # Check again next frame
+            else:
+                enemy = enemies_to_spawn.pop(0)
+                enemies.append(enemy)
+                spawn_cooldown = 30  # base interval between spawns
 
     if wave_in_progress and not enemies_to_spawn and not enemies and not game_won and not game_lost:
         current_wave += 1
