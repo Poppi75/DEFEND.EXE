@@ -118,6 +118,9 @@ class Tower:
         )
 
     def shoot(self, enemies, bullets):
+        # Blue tower (type 0) does not shoot
+        if self.type == 0:
+            return
         if self.target not in enemies or (
             self.target and math.hypot(self.target.pos[0] - self.x, self.target.pos[1] - self.y) > self.range
         ):
@@ -153,6 +156,7 @@ class Enemy:
         self.path_index = 0
         self.speed = 1  # Slower base enemy
         self.hp = 1
+        self.original_speed = self.speed  # <-- Add this line
 
     def update(self):
         if self.path_index < len(self.path) - 1:
@@ -174,6 +178,7 @@ class FastEnemy(Enemy):
     def __init__(self, path):
         super().__init__(path)
         self.speed = 2  # Faster
+        self.original_speed = self.speed  # <-- Add this line
 
     def draw(self, surf):
         color = (0, 200, 255) if not invert else invert_color((0, 200, 255))
@@ -184,6 +189,7 @@ class DurableEnemy(Enemy):
         super().__init__(path)
         self.hp = 3
         self.speed = 1
+        self.original_speed = self.speed  # <-- Add this line
 
     def draw(self, surf):
         color = (128, 0, 128) if not invert else invert_color((128, 0, 128))
@@ -406,6 +412,19 @@ while running:
         wave_in_progress = False
 
     if not paused and not game_won and not game_lost:
+        # --- Apply Blue tower slow effect ---
+        for enemy in enemies:
+            enemy.speed = enemy.original_speed  # Reset speed each frame
+
+        for tower in towers:
+            if tower.type == 0:  # Blue tower
+                for enemy in enemies:
+                    dx = enemy.pos[0] - tower.x
+                    dy = enemy.pos[1] - tower.y
+                    dist = math.hypot(dx, dy)
+                    if dist <= tower.range:
+                        enemy.speed = enemy.original_speed * 0.35  # Slow to 35% speed
+
         for tower in towers:
             tower.shoot(enemies, bullets)
 
