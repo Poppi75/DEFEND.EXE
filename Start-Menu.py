@@ -51,6 +51,12 @@ settings_text_rect = settings_text.get_rect(center=(screen_width // 2, screen_he
 quit_text = font.render("Quit", True, fg)
 quit_text_rect = quit_text.get_rect(center=(screen_width // 2, screen_height // 2 + 80 + 100))
 
+delete_font = pygame.font.SysFont(None, 40)
+delete_text = delete_font.render("Delete Progress", True, fg)
+delete_text_rect = delete_text.get_rect(bottomright=(screen_width - 40, screen_height - 30))
+
+progress_deleted = False  # Add this flag
+
 running = True
 while running:
     for event in pygame.event.get():
@@ -85,11 +91,25 @@ while running:
                 settings_text_rect = settings_text.get_rect(center=(screen_width // 2, screen_height // 2 + 0 + 100))
                 quit_text = font.render("Quit", True, fg)
                 quit_text_rect = quit_text.get_rect(center=(screen_width // 2, screen_height // 2 + 80 + 100))
+                delete_text = delete_font.render("Delete Progress", True, fg)
+                delete_text_rect = delete_text.get_rect(bottomright=(screen_width - 40, screen_height - 30))
+            elif delete_text_rect.collidepoint(event.pos):
+                # Reset unlocked_levels to 1
+                settings["unlocked_levels"] = 1
+                save_settings(settings)
+                progress_deleted = True  # Set flag
 
     screen.blit(background, (0, 0))
     screen.blit(button_text, button_text_rect)
     screen.blit(settings_text, settings_text_rect)
     screen.blit(quit_text, quit_text_rect)
+    screen.blit(delete_text, delete_text_rect)
+
+    if progress_deleted:
+        confirm_text = delete_font.render("Progress deleted!", True, (255, 80, 80))
+        confirm_rect = confirm_text.get_rect(bottomright=(screen_width - 40, screen_height - 70))
+        screen.blit(confirm_text, confirm_rect)
+
     pygame.display.flip()
 
 pygame.quit()

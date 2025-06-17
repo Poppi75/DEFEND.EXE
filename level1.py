@@ -361,9 +361,13 @@ class Tower:
         self.target = None
 
     def draw(self, surf):
-        color = TOWER_TYPES[self.type]["color"]
-        color = color if not invert else invert_color(color)
-        pygame.draw.rect(surf, color, (self.x - 20, self.y - 20, 40, 40))
+        if self.type == 0:
+            # Draw blue tower with even bigger image, center it
+            surf.blit(blue_tower_img, (self.x - 45, self.y - 45))  # Center 90x90
+        else:
+            color = TOWER_TYPES[self.type]["color"]
+            color = color if not invert else invert_color(color)
+            pygame.draw.rect(surf, color, (self.x - 20, self.y - 20, 40, 40))  # Smaller for other towers
         pygame.draw.circle(
             surf,
             (100, 100, 255) if not invert else invert_color((100, 100, 255)),
@@ -411,7 +415,7 @@ class Enemy:
         self.path_index = 0
         self.speed = 1  # Slower base enemy
         self.hp = 1
-        self.original_speed = self.speed  # <-- Add this line
+        self.original_speed = self.speed
 
     def update(self):
         if self.path_index < len(self.path) - 1:
@@ -426,8 +430,7 @@ class Enemy:
                 self.pos[1] += self.speed * dy / dist
 
     def draw(self, surf):
-        color = (255, 0, 0) if not invert else invert_color((255, 0, 0))
-        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 20)
+        surf.blit(enemy_img, (int(self.pos[0]) - 40, int(self.pos[1]) - 40))  # Center 80x80
 
 class FastEnemy(Enemy):
     def __init__(self, path):
@@ -436,8 +439,7 @@ class FastEnemy(Enemy):
         self.original_speed = self.speed  # <-- Add this line
 
     def draw(self, surf):
-        color = (0, 200, 255) if not invert else invert_color((0, 200, 255))
-        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 18)
+        surf.blit(fast_enemy_img, (int(self.pos[0]) - 30, int(self.pos[1]) - 30))  # Center 60x60
 
 class DurableEnemy(Enemy):
     def __init__(self, path):
@@ -447,8 +449,8 @@ class DurableEnemy(Enemy):
         self.original_speed = self.speed  # <-- Add this line
 
     def draw(self, surf):
-        color = (128, 0, 128) if not invert else invert_color((128, 0, 128))
-        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 24)
+        surf.blit(durable_enemy_img, (int(self.pos[0]) - 40, int(self.pos[1]) - 40))  # Center 80x80
+        # Draw HP as before
         hp_label = small_font.render(str(self.hp), True, (255,255,255) if not invert else (0,0,0))
         surf.blit(hp_label, (int(self.pos[0])-10, int(self.pos[1])-10))
 
@@ -475,6 +477,18 @@ class Bullet:
     def draw(self, surf):
         color = (255, 255, 0) if not invert else invert_color((255, 255, 0))
         pygame.draw.circle(surf, color, (int(self.x), int(self.y)), self.radius)
+
+# Make enemy images bigger
+enemy_img = pygame.image.load("WannaCry.png").convert_alpha()
+enemy_img = pygame.transform.scale(enemy_img, (60, 60))         # Now square, same as BonziBUDDY
+fast_enemy_img = pygame.image.load("trojan.png").convert_alpha()
+fast_enemy_img = pygame.transform.scale(fast_enemy_img, (60, 60))
+durable_enemy_img = pygame.image.load("BonziBUDDY.webp").convert_alpha()
+durable_enemy_img = pygame.transform.scale(durable_enemy_img, (60, 60))
+
+# Make blue tower image even bigger
+blue_tower_img = pygame.image.load("pindows_defender.png").convert_alpha()
+blue_tower_img = pygame.transform.scale(blue_tower_img, (90, 90))  # Increased from 60x60
 
 enemy_spawn_timer = 0
 enemy_spawn_interval = 120
@@ -835,7 +849,11 @@ while running:
         else:
             preview_color = (200, 50, 50) if not invert else invert_color((200, 50, 50))
             radius_color = (200, 50, 50) if not invert else invert_color((200, 50, 50))
-        pygame.draw.rect(virtual_surface, preview_color, (px - 20, py - 20, 40, 40), 2)
+        # Draw preview square matching the tower image size
+        if ttype == 0:
+            pygame.draw.rect(virtual_surface, preview_color, (px - 45, py - 45, 90, 90), 2)  # Blue tower: 90x90
+        else:
+            pygame.draw.rect(virtual_surface, preview_color, (px - 20, py - 20, 40, 40), 2)
         pygame.draw.circle(
             virtual_surface,
             radius_color,
