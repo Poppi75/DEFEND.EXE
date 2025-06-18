@@ -35,65 +35,248 @@ def unlock_level(level):
 
 # --- PUZZLES ---
 PUZZLES = [
+    # LOGIC TASKS (8 puzzles)
     {
-        "question": "A scanner checks 60 files. Every 4th file is marked suspicious. Every 6th file is marked critical.\nHow many files are marked both suspicious and critical?",
+        "question": "Which number is missing?\n2, 4, 8, 16, ?",
         "options": [
-            "10",
-            "15",
-            "5",
-            "20"
+            "18",
+            "24",
+            "32",
+            "30"
         ],
-        "answer": 0  # 10
+        "answer": 2  # 32
     },
     {
-        "question": "You have three virus names: WormX, BugZ, and TrojY.\n\n    BugZ always appears after WormX.\n    TrojY never appears with BugZ.\nIf BugZ is detected, which virus cannot be present?",
+        "question": "What is the output?\n\nif True or False and False:\n    print(\"Yes\")\nelse:\n    print(\"No\")",
         "options": [
-            "WormX",
-            "TrojY",
-            "BugZ",
+            "Yes",
+            "No",
+            "Error",
             "None"
         ],
-        "answer": 1  # TrojY
+        "answer": 0  # Yes
     },
     {
-        "question": "What’s wrong with this Python code?\n\nif virusDetected = True:\n    quarantine()",
+        "question": "Which one does NOT belong?",
         "options": [
-            "if should be while",
-            "Missing :",
-            "= should be ==",
-            "The function quarantine is misspelled"
+            "Firewall",
+            "Antivirus",
+            "Trojan",
+            "Scanner"
         ],
-        "answer": 2  # = should be ==
+        "answer": 2  # Trojan
     },
     {
-        "question": "What will this code do?\n\nwhile True:\n    print(\"Scanning...\")",
+        "question": "How many times will this run?\n\nfor i in range(0, 5):\n    print(i)",
         "options": [
-            "Scan 100 files",
-            "Run forever",
-            "Run once",
-            "Give an error"
+            "4",
+            "5",
+            "6",
+            "Infinite"
         ],
-        "answer": 1  # Run forever
+        "answer": 1  # 5
     },
     {
-        "question": "Your backup fails if either of these are true:\n    Disk is full\n    Network is disconnected\nWhich condition correctly triggers the backup failure?",
+        "question": "Which one is NOT a valid boolean value?",
         "options": [
-            "if disk_full and network_connected:",
-            "if disk_full or not network_connected:",
-            "if not disk_full and not network_connected:",
-            "if not disk_full or network_connected:"
+            "True",
+            "False",
+            "None",
+            "Both"
         ],
-        "answer": 1  # if disk_full or not network_connected:
+        "answer": 2  # None
     },
     {
-        "question": "CPU temperature is too high if it’s over 80°C and the CPU load is over 90%.\nWhich condition should be used?",
+        "question": "You have a key, a firewall, and a lock. What opens access?",
         "options": [
-            "if temp > 80 or load > 90:",
-            "if temp > 80 and load > 90:",
-            "if temp < 80 and load < 90:",
-            "if temp > 80:"
+            "Key",
+            "Firewall",
+            "Lock",
+            "Virus"
         ],
-        "answer": 1  # if temp > 80 and load > 90:
+        "answer": 0  # Key
+    },
+    {
+        "question": "Which result is TRUE?\n\nnot (False and True)",
+        "options": [
+            "True",
+            "False",
+            "Error",
+            "None"
+        ],
+        "answer": 0  # True
+    },
+    {
+        "question": "If a scanner removes 3 viruses and 2 reappear, how many were removed in total?",
+        "options": [
+            "1",
+            "5",
+            "2",
+            "3"
+        ],
+        "answer": 1  # 5
+    },
+    # CODE FIXES (Python only, 8 puzzles)
+    {
+        "question": "What’s wrong with this code?\n\nvalues = [1, 2, 3, 4]\nfor i in range(len(values)):\n    print(values[i + 1])",
+        "options": [
+            "values is not iterable",
+            "i + 1 causes IndexError",
+            "Syntax error",
+            "It prints wrong values"
+        ],
+        "answer": 1  # i + 1 causes IndexError
+    },
+    {
+        "question": "Why does this crash with AttributeError?\n\nnumber = 10\nprint(number.append(5))",
+        "options": [
+            "append used on int",
+            "print() is broken",
+            "append() needs two values",
+            "number not declared"
+        ],
+        "answer": 0  # append used on int
+    },
+    {
+        "question": "What’s the issue with this function?\n\ndef is_even(n):\n    if n % 2 = 0:\n        return True\n    else:\n        return False",
+        "options": [
+            "= used instead of ==",
+            "% doesn’t work on n",
+            "Should return a string",
+            "Missing parameter"
+        ],
+        "answer": 0  # = used instead of ==
+    },
+    {
+        "question": "What’s the fix for this crash?\n\nuser_input = input(\"Age: \")\nage = user_input + 5\nprint(age)",
+        "options": [
+            "Can’t add to string",
+            "input() is invalid",
+            "Must use f-strings",
+            "age is undefined"
+        ],
+        "answer": 0  # Can’t add to string
+    },
+    {
+        "question": "Why will this always return the same result?\n\ndef scan():\n    threats = []\n    threats.append(\"trojan\")\n    return threats\n\nthreats = scan()\nprint(threats)\nthreats = scan()\nprint(threats)",
+        "options": [
+            "List gets overwritten",
+            "Same list object is reused",
+            "append() doesn’t work",
+            "Needs global variable"
+        ],
+        "answer": 1  # Same list object is reused
+    },
+    {
+        "question": "Why is this if check unreliable?\n\nis_ready = \"False\"\nif not is_ready:\n    print(\"Not ready\")\nelse:\n    print(\"Ready\")",
+        "options": [
+            "String \"False\" is truthy",
+            "not cannot be used",
+            "Needs is_ready == False",
+            "Crash at runtime"
+        ],
+        "answer": 0  # String "False" is truthy
+    },
+    {
+        "question": "What causes this logic bug?\n\nfiles = [\"log.txt\", \"data.csv\", \"virus.exe\"]\nfor f in files:\n    if \"virus\" in f:\n        continue\n        print(\"Skipping virus\")",
+        "options": [
+            "continue should be break",
+            "print after continue never runs",
+            "\"virus\" isn’t in list",
+            "Syntax error"
+        ],
+        "answer": 1  # print after continue never runs
+    },
+    {
+        "question": "Why does this condition never trigger?\n\nconnections = None\nif len(connections) == 0:\n    print(\"No connections\")",
+        "options": [
+            "len() can’t be used on None",
+            "connections is a string",
+            "0 is not a valid length",
+            "Should use connections.empty()"
+        ],
+        "answer": 0  # len() can’t be used on None
+    },
+    # SYSTEM ERRORS (8 puzzles)
+    {
+        "question": "What is a likely reason a firewall blocks traffic?",
+        "options": [
+            "CPU load",
+            "Port not allowed",
+            "Wi-Fi disabled",
+            "Antivirus crash"
+        ],
+        "answer": 1  # Port not allowed
+    },
+    {
+        "question": "Your scanner won’t start. What’s first to check?",
+        "options": [
+            "Internet",
+            "Power",
+            "Permissions",
+            "BIOS"
+        ],
+        "answer": 2  # Permissions
+    },
+    {
+        "question": "Program crashes only on one OS. What’s likely?",
+        "options": [
+            "Syntax error",
+            "OS-specific paths",
+            "RAM issue",
+            "Resolution mismatch"
+        ],
+        "answer": 1  # OS-specific paths
+    },
+    {
+        "question": "You see “FileNotFoundError”. What does that mean?",
+        "options": [
+            "Missing import",
+            "Syntax error",
+            "File doesn't exist",
+            "Permission denied"
+        ],
+        "answer": 2  # File doesn't exist
+    },
+    {
+        "question": "Your antivirus says “update failed.” Most likely cause?",
+        "options": [
+            "CPU overheat",
+            "Disk full",
+            "No internet",
+            "Wrong version"
+        ],
+        "answer": 2  # No internet
+    },
+    {
+        "question": "You launch a scanner, but nothing happens. What’s missing?",
+        "options": [
+            "Admin rights",
+            "DNS",
+            "Display driver",
+            "API"
+        ],
+        "answer": 0  # Admin rights
+    },
+    {
+        "question": "You get \"Access denied\" when writing a file. Why?",
+        "options": [
+            "Wrong filename",
+            "Permission issue",
+            "File too large",
+            "OS crash"
+        ],
+        "answer": 1  # Permission issue
+    },
+    {
+        "question": "App fails to open and throws a “missing DLL” error. This means:",
+        "options": [
+            "Disk failure",
+            "Library file not found",
+            "Invalid port",
+            "Path too long"
+        ],
+        "answer": 1  # Library file not found
     }
 ]
 
@@ -178,9 +361,13 @@ class Tower:
         self.target = None
 
     def draw(self, surf):
-        color = TOWER_TYPES[self.type]["color"]
-        color = color if not invert else invert_color(color)
-        pygame.draw.rect(surf, color, (self.x - 20, self.y - 20, 40, 40))
+        if self.type == 0:
+            # Draw blue tower with even bigger image, center it
+            surf.blit(blue_tower_img, (self.x - 45, self.y - 45))  # Center 90x90
+        else:
+            color = TOWER_TYPES[self.type]["color"]
+            color = color if not invert else invert_color(color)
+            pygame.draw.rect(surf, color, (self.x - 20, self.y - 20, 40, 40))  # Smaller for other towers
         pygame.draw.circle(
             surf,
             (100, 100, 255) if not invert else invert_color((100, 100, 255)),
@@ -228,7 +415,7 @@ class Enemy:
         self.path_index = 0
         self.speed = 1  # Slower base enemy
         self.hp = 1
-        self.original_speed = self.speed  # <-- Add this line
+        self.original_speed = self.speed
 
     def update(self):
         if self.path_index < len(self.path) - 1:
@@ -243,8 +430,7 @@ class Enemy:
                 self.pos[1] += self.speed * dy / dist
 
     def draw(self, surf):
-        color = (255, 0, 0) if not invert else invert_color((255, 0, 0))
-        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 20)
+        surf.blit(enemy_img, (int(self.pos[0]) - 40, int(self.pos[1]) - 40))  # Center 80x80
 
 class FastEnemy(Enemy):
     def __init__(self, path):
@@ -253,8 +439,7 @@ class FastEnemy(Enemy):
         self.original_speed = self.speed  # <-- Add this line
 
     def draw(self, surf):
-        color = (0, 200, 255) if not invert else invert_color((0, 200, 255))
-        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 18)
+        surf.blit(fast_enemy_img, (int(self.pos[0]) - 30, int(self.pos[1]) - 30))  # Center 60x60
 
 class DurableEnemy(Enemy):
     def __init__(self, path):
@@ -264,8 +449,8 @@ class DurableEnemy(Enemy):
         self.original_speed = self.speed  # <-- Add this line
 
     def draw(self, surf):
-        color = (128, 0, 128) if not invert else invert_color((128, 0, 128))
-        pygame.draw.circle(surf, color, (int(self.pos[0]), int(self.pos[1])), 24)
+        surf.blit(durable_enemy_img, (int(self.pos[0]) - 40, int(self.pos[1]) - 40))  # Center 80x80
+        # Draw HP as before
         hp_label = small_font.render(str(self.hp), True, (255,255,255) if not invert else (0,0,0))
         surf.blit(hp_label, (int(self.pos[0])-10, int(self.pos[1])-10))
 
@@ -292,6 +477,18 @@ class Bullet:
     def draw(self, surf):
         color = (255, 255, 0) if not invert else invert_color((255, 255, 0))
         pygame.draw.circle(surf, color, (int(self.x), int(self.y)), self.radius)
+
+# Make enemy images bigger
+enemy_img = pygame.image.load("WannaCry.png").convert_alpha()
+enemy_img = pygame.transform.scale(enemy_img, (60, 60))         # Now square, same as BonziBUDDY
+fast_enemy_img = pygame.image.load("trojan.png").convert_alpha()
+fast_enemy_img = pygame.transform.scale(fast_enemy_img, (60, 60))
+durable_enemy_img = pygame.image.load("BonziBUDDY.webp").convert_alpha()
+durable_enemy_img = pygame.transform.scale(durable_enemy_img, (60, 60))
+
+# Make blue tower image even bigger
+blue_tower_img = pygame.image.load("pindows_defender.png").convert_alpha()
+blue_tower_img = pygame.transform.scale(blue_tower_img, (90, 90))  # Increased from 60x60
 
 enemy_spawn_timer = 0
 enemy_spawn_interval = 120
@@ -379,7 +576,7 @@ def get_shuffled_puzzle(puzzle):
     new_options = [opt for idx, opt in zipped]
     new_answer = [i for i, (orig_idx, _) in enumerate(zipped) if orig_idx == answer][0]
     return {
-        "question": puzzle["question"] + "\n\n(Options change places each time!)",
+        "question": puzzle["question"],  # Removed extra text
         "options": new_options,
         "answer": new_answer
     }
@@ -414,30 +611,33 @@ while running:
             vy = int(my * VIRTUAL_HEIGHT / SCREEN_HEIGHT)
             for idx, opt_rect in enumerate(puzzle_option_rects):
                 if opt_rect.collidepoint(vx, vy):
-                    ttype = 0
+                    ttype = placement_preview[2] if placement_preview else 0
                     if idx == current_puzzle["answer"]:
-                        ttype = 0
                         if is_valid_tower_position(placement_preview[0], placement_preview[1], ttype):
                             towers.append(Tower(placement_preview[0], placement_preview[1], ttype))
                             puzzle_result = True
                             placing_tower = False
                             placement_preview = None
                             dragging = False
-                            tower_place_cooldowns[0] = 120  # 2 seconds for base tower
+                            tower_place_cooldowns[ttype] = 120  # 2 seconds for this tower
                             puzzle_active = False
                         else:
                             puzzle_result = "invalid"
                             # Re-shuffle puzzle for next attempt
-                            current_puzzle = get_shuffled_puzzle(PUZZLES[last_puzzle_index])
+                            available = [i for i in range(len(PUZZLES)) if i != last_puzzle_index]
+                            if not available:
+                                available = list(range(len(PUZZLES)))
+                            idx2 = random.choice(available)
+                            current_puzzle = get_shuffled_puzzle(PUZZLES[idx2])
+                            last_puzzle_index = idx2
                             puzzle_active = True
-                            # Do NOT set placing_tower = False, etc.
                             continue  # Skip rest of event loop for this click
                     else:
                         puzzle_result = False
                         placing_tower = False
                         placement_preview = None
                         dragging = False
-                        tower_place_cooldowns[0] = 120  # 2 seconds for base tower
+                        tower_place_cooldowns[ttype] = 120  # 2 seconds for this tower
                         puzzle_active = False
 
         if event.type == pygame.QUIT or (
@@ -491,7 +691,7 @@ while running:
                     cancel_rect = pygame.Rect(placement_preview[0] - 130, placement_preview[1] - 30, 80, 40)
                     if accept_rect.collidepoint(vx, vy):
                         ttype = placement_preview[2]
-                        if ttype == 0 and not puzzle_active and tower_place_cooldowns[0] == 0:
+                        if not puzzle_active and tower_place_cooldowns[ttype] == 0:
                             # Pick a random puzzle, not the same as last time if possible
                             available = [i for i in range(len(PUZZLES)) if i != last_puzzle_index]
                             if not available:
@@ -501,12 +701,6 @@ while running:
                             last_puzzle_index = idx
                             puzzle_active = True
                             puzzle_result = None
-                        elif is_valid_tower_position(placement_preview[0], placement_preview[1], ttype) and tower_place_cooldowns[ttype] == 0:
-                            towers.append(Tower(placement_preview[0], placement_preview[1], ttype))
-                            placing_tower = False
-                            placement_preview = None
-                            dragging = False
-                            tower_place_cooldowns[ttype] = 120  # 2 seconds
                     elif cancel_rect.collidepoint(vx, vy):
                         placing_tower = False
                         placement_preview = None
@@ -605,8 +799,8 @@ while running:
     virtual_surface.blit(text, (10, 10))
     wave_label = font.render(f"Wave: {min(current_wave, max_wave)}", True, fg)
     virtual_surface.blit(wave_label, (10, 50))
-    small = small_font.render("ESC to quit, click to place towers", True, fg)
-    virtual_surface.blit(small, (10, 90))
+    # Removed: small = small_font.render("ESC to quit, click to place towers", True, fg)
+    # Removed: virtual_surface.blit(small, (10, 90))
 
     menu_left = VIRTUAL_WIDTH - MENU_WIDTH
     pygame.draw.rect(virtual_surface, MENU_BG, (menu_left, 0, MENU_WIDTH, VIRTUAL_HEIGHT))
@@ -655,7 +849,11 @@ while running:
         else:
             preview_color = (200, 50, 50) if not invert else invert_color((200, 50, 50))
             radius_color = (200, 50, 50) if not invert else invert_color((200, 50, 50))
-        pygame.draw.rect(virtual_surface, preview_color, (px - 20, py - 20, 40, 40), 2)
+        # Draw preview square matching the tower image size
+        if ttype == 0:
+            pygame.draw.rect(virtual_surface, preview_color, (px - 45, py - 45, 90, 90), 2)  # Blue tower: 90x90
+        else:
+            pygame.draw.rect(virtual_surface, preview_color, (px - 20, py - 20, 40, 40), 2)
         pygame.draw.circle(
             virtual_surface,
             radius_color,
